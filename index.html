@@ -273,20 +273,14 @@ audio { display: none; }
     <span class="mb mb-cer">CER — Contextual Error Rate (proposed)</span>
   </div>
 
-  <!-- GitHub note -->
-  <div class="gh-note">
-    Audio hosted on GitHub. Replace each <span>audioSrc</span> in the SAMPLES array with:<br>
-    <span>https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/audio/FILENAME.wav</span>
-  </div>
 
   <!-- Sample selector -->
   <div class="selector-label">Select audio sample</div>
   <select id="sampleSelect" onchange="loadSample(this.value)">
-    <option value="0">Sample 01 — Altitude clearance · low WER, critical altitude error</option>
-    <option value="1">Sample 02 — Callsign confusion · wrong airline, different aircraft</option>
-    <option value="2">Sample 03 — Heading direction · one word, opposite instruction</option>
-    <option value="3">Sample 04 — Format variation · high WER, equivalent meaning</option>
-    <option value="4">Sample 05 — Frequency mishear · one digit, wrong facility</option>
+    <option value="0">Sample 01 — Navigation · low WER (0.08), critical distance error</option>
+    <option value="1">Sample 02 — Equivalent · high WER (0.56), zero operational impact</option>
+    <option value="2">Sample 03 — Altitude · low WER (0.06), critical altitude error</option>
+    <option value="3">Sample 04 — Callsign · low WER (0.08), wrong flight number</option>
   </select>
 
   <!-- ── AUDIO CARD ─────────────────────────────────── -->
@@ -406,58 +400,47 @@ audio { display: none; }
 
 const SAMPLES = [
   {
-    audioSrc: "",
-    audioLabel: "ZSE_4616_14 — FAA ARTCC",
-    wer: 0.20, bert: 0.91, cer: "CRITICAL", cerGood: false,
-    insight: "<strong>Metrics disagree on a life-critical error.</strong> WER is low, BERTScore is high — both signal acceptable quality. But the ASR model substituted FL140 with FL150. In ATC, a 1,000 ft altitude error can collapse vertical separation between aircraft.",
-    ref: `climb and maintain <span class="tooltip-wrap w-err">flight level one four zero<span class="tooltip"><span class="t-type">CRITICAL — ALTITUDE</span><span class="t-entity">FL140 → FL150 · risk: vertical separation</span></span></span>, contact departure`,
-    hyp: `climb and maintain <span class="w-err">flight level one five zero</span>, contact departure`,
+    audioSrc: "https://raw.githubusercontent.com/MrVersatile007/FAA-Project/main/FAA-Navigation.wav",
+    audioLabel: "FAA-Navigation — FAA ARTCC",
+    wer: 0.08, bert: 0.91, cer: "CRITICAL", cerGood: false,
+    insight: "<strong>Low WER, but the distance report is critically wrong.</strong> Just one word different — WER 0.08. But 'fifty miles' vs 'sixty miles' is a 10-nautical-mile error in a traffic position report. At cruise speeds that collapses the separation buffer between aircraft.",
+    ref: "i'm sorry at thirty two at eleven o'clock <span class=\"tooltip-wrap w-err\">fifty miles<span class=\"tooltip\"><span class=\"t-type\">CRITICAL &mdash; NAVIGATION</span><span class=\"t-entity\">fifty miles &rarr; sixty miles &middot; position error</span></span></span>",
+    hyp: "i'm sorry at thirty two at eleven o'clock <span class=\"w-err\">sixty miles</span>",
     errors: [
-      { entity:"altitude", ec:"et-altitude", ref:"flight level one four zero", hyp:"flight level one five zero", type:"CRITICAL", tc:"b-crit", risk:"HIGH", rc:"b-crit" }
+      { entity:"navigation", ec:"et-heading", ref:"fifty miles", hyp:"sixty miles", type:"CRITICAL", tc:"b-crit", risk:"MEDIUM", rc:"b-equiv" }
     ]
   },
   {
-    audioSrc: "",
-    audioLabel: "ATL_2201_07 — FAA ARTCC",
-    wer: 0.33, bert: 0.87, cer: "CRITICAL", cerGood: false,
-    insight: "<strong>Wrong airline — clearance issued to the wrong flight.</strong> A single-word callsign substitution means the takeoff clearance was directed at a completely different aircraft. WER detects the error but still rates this as moderate quality.",
-    ref: `<span class="tooltip-wrap w-err">Delta<span class="tooltip"><span class="t-type">CRITICAL — CALLSIGN</span><span class="t-entity">Delta 421 → United 421 · wrong aircraft cleared</span></span></span> four two one, runway two five right, cleared for takeoff`,
-    hyp: `<span class="w-err">United</span> four two one, runway two five right, cleared for takeoff`,
+    audioSrc: "https://raw.githubusercontent.com/MrVersatile007/FAA-Project/main/FAA-Equivalent.wav",
+    audioLabel: "FAA-Equivalent — FAA ARTCC",
+    wer: 0.56, bert: 0.89, cer: "EQUIV", cerGood: true,
+    insight: "<strong>WER of 0.56 — but zero operational impact.</strong> 'okay we're go get it' vs 'ok we'll have that' are informal phrasing variations with identical meaning. WER heavily penalises this. CER correctly classifies it as equivalent — no safety concern whatsoever.",
+    ref: "<span class=\"w-equiv\">okay we're go get it</span> in a minute",
+    hyp: "<span class=\"w-equiv\">ok we'll have that</span> in a minute",
     errors: [
-      { entity:"callsign", ec:"et-callsign", ref:"Delta 421", hyp:"United 421", type:"CRITICAL", tc:"b-crit", risk:"HIGH", rc:"b-crit" }
+      { entity:"clearance", ec:"et-frequency", ref:"okay we're go get it", hyp:"ok we'll have that", type:"EQUIV", tc:"b-equiv", risk:"NONE", rc:"b-safe" }
     ]
   },
   {
-    audioSrc: "",
-    audioLabel: "ZLA_0088_03 — FAA ARTCC",
-    wer: 0.14, bert: 0.94, cer: "CRITICAL", cerGood: false,
-    insight: "<strong>One word. Opposite instruction.</strong> BERTScore 0.94 — the sentences are nearly identical. But left vs right is not a formatting difference. The aircraft would turn in the wrong direction, directly conflicting with other traffic.",
-    ref: `turn <span class="tooltip-wrap w-err">left<span class="tooltip"><span class="t-type">CRITICAL — HEADING</span><span class="t-entity">left → right · opposite turn direction</span></span></span> heading two seven zero`,
-    hyp: `turn <span class="w-err">right</span> heading two seven zero`,
+    audioSrc: "https://raw.githubusercontent.com/MrVersatile007/FAA-Project/main/FAA-Altitude.wav",
+    audioLabel: "FAA-Altitude — FAA ARTCC",
+    wer: 0.06, bert: 0.93, cer: "CRITICAL", cerGood: false,
+    insight: "<strong>Nearly identical sentences, critically different altitude.</strong> WER 0.06 — one word. BERTScore 0.93. But 'sixteen thousand' vs 'fifteen thousand' is a 1,000 ft altitude assignment error. In a climb clearance this directly affects vertical separation with other traffic.",
+    ref: "lindbergh sixty two twenty seven chicago departure radar contact climb and maintain one five <span class=\"tooltip-wrap w-err\">sixteen thousand<span class=\"tooltip\"><span class=\"t-type\">CRITICAL &mdash; ALTITUDE</span><span class=\"t-entity\">16,000 ft &rarr; 15,000 ft &middot; separation risk</span></span></span>",
+    hyp: "lindbergh sixty two twenty seven chicago departure radar contact climb and maintain one five <span class=\"w-err\">fifteen thousand</span>",
     errors: [
-      { entity:"heading", ec:"et-heading", ref:"turn left hdg 270", hyp:"turn right hdg 270", type:"CRITICAL", tc:"b-crit", risk:"HIGH", rc:"b-crit" }
+      { entity:"altitude", ec:"et-altitude", ref:"sixteen thousand (16,000 ft)", hyp:"fifteen thousand (15,000 ft)", type:"CRITICAL", tc:"b-crit", risk:"HIGH", rc:"b-crit" }
     ]
   },
   {
-    audioSrc: "",
-    audioLabel: "BOS_1104_11 — FAA ARTCC",
-    wer: 0.50, bert: 0.88, cer: "EQUIV", cerGood: true,
-    insight: "<strong>WER penalises a perfectly valid transcription.</strong> Half the words are flagged as wrong. In reality, spoken callsign format and digit format are operationally identical in ATC. CER correctly classifies this as equivalent — zero safety impact.",
-    ref: `<span class="w-equiv">United one two three</span>, cleared ILS runway two eight left`,
-    hyp: `<span class="w-equiv">United 123</span>, cleared ILS runway two eight left`,
+    audioSrc: "https://raw.githubusercontent.com/MrVersatile007/FAA-Project/main/FAA-Callsign.wav",
+    audioLabel: "FAA-Callsign — FAA ARTCC",
+    wer: 0.08, bert: 0.92, cer: "CRITICAL", cerGood: false,
+    insight: "<strong>Wrong flight number — instruction sent to the wrong aircraft.</strong> 'six thirty two' vs 'six fifty two' — two digits transposed, WER 0.08, BERTScore 0.92. But United 632 and United 652 are different flights. Any clearance following this is directed at the wrong aircraft.",
+    ref: "united <span class=\"tooltip-wrap w-err\">six thirty two<span class=\"tooltip\"><span class=\"t-type\">CRITICAL &mdash; CALLSIGN</span><span class=\"t-entity\">United 632 &rarr; United 652 &middot; wrong flight</span></span></span> tango thank you for now track localizer inbound",
+    hyp: "united <span class=\"w-err\">six fifty two</span> tango thank you for now track localizer inbound",
     errors: [
-      { entity:"callsign", ec:"et-callsign", ref:"United one two three", hyp:"United 123", type:"EQUIV", tc:"b-equiv", risk:"NONE", rc:"b-safe" }
-    ]
-  },
-  {
-    audioSrc: "",
-    audioLabel: "ZDV_3312_09 — FAA ARTCC",
-    wer: 0.17, bert: 0.93, cer: "CRITICAL", cerGood: false,
-    insight: "<strong>One digit, two different facilities.</strong> 121.9 and 121.7 look nearly identical — BERTScore 0.93. But these are different radio frequencies assigned to different controllers. The pilot contacts the wrong facility and disappears from the correct controller's scope.",
-    ref: `contact departure on <span class="tooltip-wrap w-err">one two one point niner<span class="tooltip"><span class="t-type">CRITICAL — FREQUENCY</span><span class="t-entity">121.9 → 121.7 MHz · wrong facility</span></span></span>`,
-    hyp: `contact departure on <span class="w-err">one two one point seven</span>`,
-    errors: [
-      { entity:"frequency", ec:"et-frequency", ref:"121.9 MHz", hyp:"121.7 MHz", type:"CRITICAL", tc:"b-crit", risk:"HIGH", rc:"b-crit" }
+      { entity:"callsign", ec:"et-callsign", ref:"United 632", hyp:"United 652", type:"CRITICAL", tc:"b-crit", risk:"HIGH", rc:"b-crit" }
     ]
   }
 ];
