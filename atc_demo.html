@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATC Contextual Error Rate — Live Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e14;
+    --surface: #111720;
+    --surface2: #181f2a;
+    --border: #1e2d3d;
+    --border2: #243447;
+    --text: #cdd9e5;
+    --text2: #8b9ab0;
+    --text3: #4a5a6e;
+    --accent: #58a6ff;
+    --accent2: #1f6feb;
+    --green: #3fb950;
+    --green-bg: #0f2a17;
+    --green-border: #1a4a28;
+    --red: #f85149;
+    --red-bg: #2a0f0f;
+    --red-border: #4a1a1a;
+    --amber: #e3b341;
+    --amber-bg: #2a1f0a;
+    --amber-border: #4a3a12;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(88,166,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(88,166,255,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .wrap { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    background: rgba(88,166,255,0.08);
+    border: 1px solid rgba(88,166,255,0.2);
+    padding: 3px 10px;
+    border-radius: 3px;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(18px, 4vw, 26px);
+    font-weight: 600;
+    color: #e6edf3;
+    line-height: 1.3;
+    margin-bottom: 10px;
+  }
+  h1 span { color: var(--accent); }
+  .subtitle { font-size: 13px; color: var(--text2); max-width: 600px; line-height: 1.7; margin-bottom: 24px; }
+
+  .metric-legend { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .metric-badge { font-family: var(--mono); font-size: 11px; padding: 4px 12px; border-radius: 3px; border: 1px solid; }
+  .mb-wer  { color: #79c0ff; background: rgba(121,192,255,0.08); border-color: rgba(121,192,255,0.25); }
+  .mb-bert { color: #a5d6a7; background: rgba(165,214,167,0.08); border-color: rgba(165,214,167,0.25); }
+  .mb-cer  { color: #ff7b72; background: rgba(255,123,114,0.08); border-color: rgba(255,123,114,0.35); }
+
+  .selector-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); text-transform: uppercase; margin-bottom: 8px; }
+  select {
+    width: 100%;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 13px;
+    appearance: none;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b9ab0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+  }
+  select:focus { outline: none; border-color: var(--accent2); }
+
+  .audio-section {
+    margin: 20px 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .play-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--accent2);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .play-btn:hover { background: var(--accent); transform: scale(1.05); }
+  .play-btn svg { width: 16px; height: 16px; fill: white; }
+  .audio-info { flex: 1; min-width: 0; }
+  .audio-label { font-family: var(--mono); font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .audio-note { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  audio { display: none; }
+
+  .waveform { display: flex; gap: 2px; align-items: center; height: 24px; margin-top: 8px; }
+  .waveform span { display: block; width: 3px; border-radius: 2px; background: var(--border2); transition: background 0.3s; }
+  .waveform.active span { background: var(--accent2); animation: wave 0.8s ease-in-out infinite; }
+  .waveform span:nth-child(2n) { animation-delay: 0.1s; }
+  .waveform span:nth-child(3n) { animation-delay: 0.2s; }
+  .waveform span:nth-child(4n) { animation-delay: 0.3s; }
+  @keyframes wave { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(2); } }
+
+  .metrics-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .metric-card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; }
+  .metric-card.wer::after  { background: #79c0ff; }
+  .metric-card.bert::after { background: #a5d6a7; }
+  .metric-card.cer-bad::after  { background: var(--red); }
+  .metric-card.cer-good::after { background: var(--green); }
+  .metric-name { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); text-transform: uppercase; margin-bottom: 6px; }
+  .metric-value { font-family: var(--mono); font-size: 24px; font-weight: 600; line-height: 1; margin-bottom: 6px; }
+  .metric-card.wer  .metric-value { color: #79c0ff; }
+  .metric-card.bert .metric-value { color: #a5d6a7; }
+  .metric-card.cer-bad  .metric-value { color: var(--red); }
+  .metric-card.cer-good .metric-value { color: var(--green); }
+  .metric-verdict { font-family: var(--mono); font-size: 9px; font-weight: 600; padding: 2px 8px; border-radius: 3px; display: inline-block; }
+  .verdict-ok   { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+  .verdict-warn { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+  .verdict-bad  { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-border); }
+
+  .insight {
+    border: 1px solid rgba(88,166,255,0.2);
+    background: rgba(88,166,255,0.04);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 16px 0;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .insight-icon { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--accent); flex-shrink: 0; padding-top: 1px; }
+  .insight-text { font-size: 13px; color: var(--text2); line-height: 1.6; }
+  .insight-text strong { color: var(--text); font-weight: 500; }
+
+  hr.div { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .panel-header {
+    font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 8px 14px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .panel.ref .panel-header { color: #79c0ff; }
+  .panel.hyp .panel-header { color: var(--text2); }
+  .panel.ref .dot { background: #79c0ff; }
+  .panel.hyp .dot { background: var(--text3); }
+  .panel-body { padding: 14px; font-family: var(--mono); font-size: 13px; line-height: 2; color: var(--text); }
+
+  .w-err {
+    color: var(--red); background: var(--red-bg);
+    border-bottom: 2px solid var(--red);
+    padding: 0 2px; border-radius: 2px;
+    position: relative; cursor: help;
+  }
+  .w-equiv {
+    color: var(--amber); background: var(--amber-bg);
+    border-bottom: 2px solid var(--amber);
+    padding: 0 2px; border-radius: 2px;
+  }
+  .tooltip-wrap { display: inline; position: relative; }
+  .tooltip {
+    display: none; position: absolute;
+    bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    background: #1c2b3a; border: 1px solid var(--border2);
+    border-radius: 6px; padding: 8px 12px;
+    font-size: 11px; font-family: var(--sans); color: var(--text);
+    white-space: nowrap; z-index: 10; pointer-events: none;
+    min-width: 190px; line-height: 1.6;
+  }
+  .tooltip::after {
+    content: ''; position: absolute; top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent; border-top-color: var(--border2);
+  }
+  .tooltip-wrap:hover .tooltip { display: block; }
+  .t-type { color: var(--red); font-weight: 600; font-size: 10px; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+  .t-entity { color: var(--text3); font-size: 10px; display: block; }
+
+  .errors-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 20px 0; }
+  .errors-header { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .error-row { display: grid; grid-template-columns: 90px 1fr 1fr 80px 60px; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); align-items: center; font-size: 12px; }
+  .error-row:last-child { border-bottom: none; }
+  .error-row.head { font-family: var(--mono); font-size: 10px; color: var(--text3); letter-spacing: 0.06em; padding: 8px 16px; }
+
+  .entity-tag { font-family: var(--mono); font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .et-callsign  { background: rgba(121,192,255,0.1); color: #79c0ff; border: 1px solid rgba(121,192,255,0.2); }
+  .et-altitude  { background: rgba(255,123,114,0.1); color: #ff7b72; border: 1px solid rgba(255,123,114,0.2); }
+  .et-heading   { background: rgba(255,166,77,0.1);  color: #ffa64d; border: 1px solid rgba(255,166,77,0.2); }
+  .et-frequency { background: rgba(63,185,80,0.1);   color: #3fb950; border: 1px solid rgba(63,185,80,0.2); }
+
+  .badge { font-family: var(--mono); font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px; }
+  .b-crit  { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-border); }
+  .b-equiv { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+  .b-safe  { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+
+  .val-ref { color: var(--text2); font-family: var(--mono); font-size: 12px; }
+  .val-crit { color: var(--red); font-family: var(--mono); font-size: 12px; }
+  .val-equiv { color: var(--amber); font-family: var(--mono); font-size: 12px; }
+
+  .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .footer span { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+
+  .fadeable { transition: opacity 0.18s ease; }
+  .fadeable.fading { opacity: 0; }
+
+  @media (max-width: 600px) {
+    .panels { grid-template-columns: 1fr; }
+    .metrics-row { grid-template-columns: 1fr; }
+    .error-row { grid-template-columns: 80px 1fr 1fr; }
+    .error-row .sm-hide { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="tag">INTERACTIVE DEMO</div>
+  <h1>Why WER Misses What Matters<br>in <span>ATC Transcription</span></h1>
+  <p class="subtitle">Standard metrics like Word Error Rate and BERTScore fail to detect operationally critical errors in Air Traffic Control communications. Select a sample below to see where they disagree with our Contextual Error Rate.</p>
+
+  <div class="metric-legend">
+    <span class="metric-badge mb-wer">WER — Word Error Rate</span>
+    <span class="metric-badge mb-bert">BERTScore — Semantic Similarity</span>
+    <span class="metric-badge mb-cer">CER — Contextual Error Rate (proposed)</span>
+  </div>
+
+  <div class="selector-label">Select audio sample</div>
+  <select id="sampleSelect" onchange="loadSample(this.value)">
+    <option value="0">Sample 01 — Altitude clearance · low WER, critical altitude error</option>
+    <option value="1">Sample 02 — Callsign confusion · wrong airline, different aircraft</option>
+    <option value="2">Sample 03 — Heading direction · one word, opposite instruction</option>
+    <option value="3">Sample 04 — Format variation · high WER, equivalent meaning</option>
+    <option value="4">Sample 05 — Frequency mishear · one digit, wrong facility</option>
+  </select>
+
+  <div class="audio-section">
+    <button class="play-btn" id="playBtn" onclick="togglePlay()">
+      <svg id="playIcon" viewBox="0 0 16 16"><path d="M3 2l10 6-10 6z"/></svg>
+    </button>
+    <div class="audio-info">
+      <div class="audio-label" id="audioLabel">ZSE_4616_14 — FAA ARTCC Recording</div>
+      <div class="audio-note">Upload .wav files to Firebase Storage and paste URLs into SAMPLES[n].audioSrc</div>
+      <div class="waveform" id="waveform">
+        <span style="height:8px"></span><span style="height:14px"></span><span style="height:20px"></span>
+        <span style="height:12px"></span><span style="height:18px"></span><span style="height:8px"></span>
+        <span style="height:22px"></span><span style="height:16px"></span><span style="height:10px"></span>
+        <span style="height:20px"></span><span style="height:14px"></span><span style="height:18px"></span>
+        <span style="height:8px"></span><span style="height:24px"></span><span style="height:12px"></span>
+        <span style="height:18px"></span><span style="height:10px"></span><span style="height:22px"></span>
+        <span style="height:16px"></span><span style="height:8px"></span><span style="height:20px"></span>
+        <span style="height:14px"></span><span style="height:18px"></span><span style="height:10px"></span>
+        <span style="height:22px"></span><span style="height:8px"></span><span style="height:16px"></span>
+        <span style="height:12px"></span>
+      </div>
+    </div>
+    <audio id="audioPlayer" onended="stopPlay()">
+      <source id="audioSrc" src="" type="audio/wav">
+    </audio>
+  </div>
+
+  <div class="metrics-row fadeable" id="metricsRow">
+    <div class="metric-card wer">
+      <div class="metric-name">WER</div>
+      <div class="metric-value" id="werVal">—</div>
+      <div class="metric-verdict" id="werVerdict"></div>
+    </div>
+    <div class="metric-card bert">
+      <div class="metric-name">BERTScore</div>
+      <div class="metric-value" id="bertVal">—</div>
+      <div class="metric-verdict" id="bertVerdict"></div>
+    </div>
+    <div class="metric-card cer-bad" id="cerCard">
+      <div class="metric-name">CER (proposed)</div>
+      <div class="metric-value" id="cerVal">—</div>
+      <div class="metric-verdict" id="cerVerdict"></div>
+    </div>
+  </div>
+
+  <div class="insight fadeable" id="insightBox">
+    <div class="insight-icon">!</div>
+    <div class="insight-text" id="insightText"></div>
+  </div>
+
+  <hr class="div">
+
+  <div class="panels fadeable" id="panels">
+    <div class="panel ref">
+      <div class="panel-header"><span class="dot"></span>Reference (ground truth)</div>
+      <div class="panel-body" id="refText"></div>
+    </div>
+    <div class="panel hyp">
+      <div class="panel-header"><span class="dot"></span>ASR transcription</div>
+      <div class="panel-body" id="hypText"></div>
+    </div>
+  </div>
+
+  <div class="errors-section fadeable" id="errorsSection">
+    <div class="errors-header">Error breakdown</div>
+    <div class="error-row head">
+      <span>entity</span><span>reference</span><span>transcribed</span>
+      <span class="sm-hide">type</span><span class="sm-hide">risk</span>
+    </div>
+    <div id="errorRows"></div>
+  </div>
+
+  <div class="footer">
+    <span>Audio: FAA ARTCC corpus &middot; ASR: Whisper-base</span>
+    <span>[Author] &middot; [Institution] &middot; [Year]</span>
+  </div>
+
+</div>
+<script>
+// ─── Sample data ─────────────────────────────────────────────────────────────
+// audioSrc: paste Firebase Storage URL per file, e.g.
+// "https://firebasestorage.googleapis.com/v0/b/YOUR_BUCKET/o/ZSE_4616.wav?alt=media"
+
+const SAMPLES = [
+  {
+    audioSrc: "", audioLabel: "ZSE_4616_14 — FAA ARTCC",
+    wer: 0.20, bert: 0.91, cer: "CRITICAL", cerGood: false,
+    insight: "<strong>Metrics disagree on a life-critical error.</strong> WER is low, BERTScore is high — both signal acceptable quality. But the ASR model substituted FL140 with FL150. In ATC, a 1,000 ft altitude error can collapse vertical separation between aircraft.",
+    ref:  `climb and maintain <span class="tooltip-wrap w-err">flight level one four zero<span class="tooltip"><span class="t-type">CRITICAL — ALTITUDE</span><span class="t-entity">FL140 → FL150</span>Wrong altitude clearance issued</span></span>, contact departure`,
+    hyp:  `climb and maintain <span class="w-err">flight level one five zero</span>, contact departure`,
+    errors: [{ entity:"altitude", ec:"et-altitude", ref:"flight level one four zero", hyp:"flight level one five zero", type:"CRITICAL", tc:"b-crit", risk:"HIGH", rc:"b-crit" }]
+  },
+  {
+    audioSrc: "", audioLabel: "ATL_2201_07 — FAA ARTCC",
+    wer: 0.33, bert: 0.87, cer: "CRITICAL", cerGood: false,
+    insight: "<strong>Wrong airline — clearance issued to the wrong flight.</strong> WER detects the substitution but still rates this as moderate quality. A single-word callsign error means the takeoff clearance was directed to a completely different aircraft.",
+    ref:  `<span class="tooltip-wrap w-err">Delta<span class="tooltip"><span class="t-type">CRITICAL — CALLSIGN</span><span class="t-entity">Delta 421 → United 421</span>Different airline, different aircraft</span></span> four two one, runway two five right, cleared for takeoff`,
+    hyp:  `<span class="w-err">United</span> four two one, runway two five right, cleared for takeoff`,
+    errors: [{ entity:"callsign", ec:"et-callsign", ref:"Delta 421", hyp:"United 421", type:"CRITICAL", tc:"b-crit", risk:"HIGH", rc:"b-crit" }]
+  },
+  {
+    audioSrc: "", audioLabel: "ZLA_0088_03 — FAA ARTCC",
+    wer: 0.14, bert: 0.94, cer: "CRITICAL", cerGood: false,
+    insight: "<strong>One word. Opposite instruction.</strong> BERTScore 0.94 — the sentences are nearly identical. But left vs right is not a formatting difference. The aircraft would turn in the opposite direction, directly conflicting with other traffic.",
+    ref:  `turn <span class="tooltip-wrap w-err">left<span class="tooltip"><span class="t-type">CRITICAL — HEADING</span><span class="t-entity">left → right</span>Opposite turn direction</span></span> heading two seven zero`,
+    hyp:  `turn <span class="w-err">right</span> heading two seven zero`,
+    errors: [{ entity:"heading", ec:"et-heading", ref:"turn left hdg 270", hyp:"turn right hdg 270", type:"CRITICAL", tc:"b-crit", risk:"HIGH", rc:"b-crit" }]
+  },
+  {
+    audioSrc: "", audioLabel: "BOS_1104_11 — FAA ARTCC",
+    wer: 0.50, bert: 0.88, cer: "EQUIV", cerGood: true,
+    insight: "<strong>WER penalises a valid transcription.</strong> Half the words are flagged as wrong. In reality, spoken callsign format and digit format are identical in ATC. CER correctly classifies this as operationally equivalent — zero impact on safety.",
+    ref:  `<span class="w-equiv">United one two three</span>, cleared ILS runway two eight left`,
+    hyp:  `<span class="w-equiv">United 123</span>, cleared ILS runway two eight left`,
+    errors: [{ entity:"callsign", ec:"et-callsign", ref:"United one two three", hyp:"United 123", type:"EQUIV", tc:"b-equiv", risk:"NONE", rc:"b-safe" }]
+  },
+  {
+    audioSrc: "", audioLabel: "ZDV_3312_09 — FAA ARTCC",
+    wer: 0.17, bert: 0.93, cer: "CRITICAL", cerGood: false,
+    insight: "<strong>One digit, two different facilities.</strong> 121.9 and 121.7 are a single word apart — BERTScore 0.93. But these are different radio frequencies assigned to different controllers. The pilot would contact the wrong facility and disappear from the correct controller's scope.",
+    ref:  `contact departure on <span class="tooltip-wrap w-err">one two one point niner<span class="tooltip"><span class="t-type">CRITICAL — FREQUENCY</span><span class="t-entity">121.9 → 121.7 MHz</span>Wrong controller facility</span></span>`,
+    hyp:  `contact departure on <span class="w-err">one two one point seven</span>`,
+    errors: [{ entity:"frequency", ec:"et-frequency", ref:"121.9 MHz", hyp:"121.7 MHz", type:"CRITICAL", tc:"b-crit", risk:"HIGH", rc:"b-crit" }]
+  }
+];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let current = 0;
+let playing = false;
+
+function loadSample(idx) {
+  idx = parseInt(idx);
+  current = idx;
+  const s = SAMPLES[idx];
+
+  document.querySelectorAll('.fadeable').forEach(el => el.classList.add('fading'));
+
+  setTimeout(() => {
+    // metrics
+    document.getElementById('werVal').textContent = s.wer.toFixed(2);
+    document.getElementById('bertVal').textContent = s.bert.toFixed(2);
+    document.getElementById('cerVal').textContent = s.cer;
+
+    const cerCard = document.getElementById('cerCard');
+    cerCard.className = 'metric-card ' + (s.cerGood ? 'cer-good' : 'cer-bad');
+
+    const wv = s.wer, bv = s.bert;
+    setVerdict('werVerdict', wv < 0.25 ? 'LOW — "good"' : wv < 0.5 ? 'MODERATE' : 'HIGH', wv < 0.25 ? 'verdict-ok' : wv < 0.5 ? 'verdict-warn' : 'verdict-bad');
+    setVerdict('bertVerdict', bv > 0.90 ? 'HIGH — "good"' : bv > 0.80 ? 'MODERATE' : 'LOW', bv > 0.90 ? 'verdict-ok' : bv > 0.80 ? 'verdict-warn' : 'verdict-bad');
+    setVerdict('cerVerdict', s.cerGood ? 'EQUIVALENT — SAFE' : 'CRITICAL — UNSAFE', s.cerGood ? 'verdict-ok' : 'verdict-bad');
+
+    document.getElementById('insightText').innerHTML = s.insight;
+    document.getElementById('refText').innerHTML = s.ref;
+    document.getElementById('hypText').innerHTML = s.hyp;
+    document.getElementById('audioLabel').textContent = s.audioLabel;
+
+    if (s.audioSrc) {
+      document.getElementById('audioSrc').src = s.audioSrc;
+      document.getElementById('audioPlayer').load();
+    }
+
+    document.getElementById('errorRows').innerHTML = s.errors.map(e => `
+      <div class="error-row">
+        <span><span class="entity-tag ${e.ec}">${e.entity}</span></span>
+        <span class="val-ref">${e.ref}</span>
+        <span class="${e.type === 'EQUIV' ? 'val-equiv' : 'val-crit'}">${e.hyp}</span>
+        <span class="sm-hide"><span class="badge ${e.tc}">${e.type}</span></span>
+        <span class="sm-hide"><span class="badge ${e.rc}">${e.risk}</span></span>
+      </div>`).join('');
+
+    document.querySelectorAll('.fadeable').forEach(el => el.classList.remove('fading'));
+    stopPlay();
+  }, 180);
+}
+
+function setVerdict(id, text, cls) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'metric-verdict ' + cls;
+}
+
+// ─── Audio ────────────────────────────────────────────────────────────────────
+function togglePlay() {
+  const audio = document.getElementById('audioPlayer');
+  if (!SAMPLES[current].audioSrc) {
+    playing ? stopPlay() : startPlayAnim();
+    return;
+  }
+  playing ? (audio.pause(), stopPlay()) : (audio.play(), startPlayAnim());
+}
+
+function startPlayAnim() {
+  playing = true;
+  document.getElementById('waveform').classList.add('active');
+  document.getElementById('playIcon').innerHTML = '<rect x="3" y="2" width="4" height="12"/><rect x="9" y="2" width="4" height="12"/>';
+}
+
+function stopPlay() {
+  playing = false;
+  document.getElementById('waveform').classList.remove('active');
+  document.getElementById('playIcon').innerHTML = '<path d="M3 2l10 6-10 6z"/>';
+}
+
+loadSample(0);
+</script>
+</body>
+</html>
